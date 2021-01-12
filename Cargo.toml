@@ -11,3 +11,4 @@ description = "Um runtime para interpretação da linguagem de script GLanguage"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+gl_core = { path = "../gl-core", version = "0.1.0-alpha" }
