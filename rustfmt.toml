@@ -1,0 +1,5 @@
+tab_spaces = 4
+hard_tabs = true
+reorder_imports = true
+newline_style = "Unix"
+fn_args_layout = "Compressed"
