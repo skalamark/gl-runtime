@@ -13,6 +13,30 @@ impl Runtime {
 		Self {}
 	}
 
+	fn statement(
+		&self, statement: Statement, module: &String, program: &mut ProgramState,
+	) -> Result<Object, AnyError> {
+		let mut result: Object = Object::Null;
+
+		match statement {
+			Statement::Let(name, value) => {
+				let value_object: Object = match self.expression(value, module, program) {
+					Ok(object) => object,
+					Err(exception) => return Err(exception),
+				};
+				program.env.set(&name, value_object, module);
+			}
+			Statement::Expression(expression) => {
+				match self.expression(expression, module, program) {
+					Ok(object) => result = object,
+					Err(exception) => return Err(exception),
+				}
+			}
+		}
+
+		Ok(result)
+	}
+
 	pub fn run(
 		&self, ast: AbstractSyntaxTree, module: &String, program: &mut ProgramState,
 	) -> Result<Object, AnyError> {
