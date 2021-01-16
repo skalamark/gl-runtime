@@ -13,6 +13,19 @@ impl Runtime {
 		Self {}
 	}
 
+	fn literal(
+		&self, literal: Literal, module: &String, program: &mut ProgramState,
+	) -> Result<Object, AnyError> {
+		let result: Object = match literal {
+			Literal::Null => Object::Null,
+			Literal::Integer(integer) => Object::Integer(integer),
+			Literal::Boolean(boolean) => Object::Boolean(boolean),
+			Literal::String(string) => Object::String(string),
+		};
+
+		Ok(result)
+	}
+
 	fn identifier(
 		&self, identifier: String, module: &String, program: &mut ProgramState,
 	) -> Result<Object, AnyError> {
