@@ -12,4 +12,19 @@ impl Runtime {
 	pub fn new() -> Self {
 		Self {}
 	}
+
+	pub fn run(
+		&self, ast: AbstractSyntaxTree, module: &String, program: &mut ProgramState,
+	) -> Result<Object, AnyError> {
+		let mut result: Object = Object::Null;
+
+		for statement in ast.statements {
+			match self.statement(statement, module, program) {
+				Ok(object) => result = object,
+				Err(exception) => return Err(exception),
+			}
+		}
+
+		Ok(result)
+	}
 }
