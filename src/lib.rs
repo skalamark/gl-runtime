@@ -13,6 +13,21 @@ impl Runtime {
 		Self {}
 	}
 
+	fn identifier(
+		&self, identifier: String, module: &String, program: &mut ProgramState,
+	) -> Result<Object, AnyError> {
+		match program.env.get(&identifier, module) {
+			Some(object) => return Ok(object.clone()),
+			None => {
+				return Err(Exception::new(
+					module.clone(),
+					Position::default(),
+					Error::name(format!("name '{}' is not defined", &identifier)),
+				));
+			}
+		}
+	}
+
 	fn expression(
 		&self, expression: Expression, module: &String, program: &mut ProgramState,
 	) -> Result<Object, AnyError> {
