@@ -13,6 +13,25 @@ impl Runtime {
 		Self {}
 	}
 
+	fn expression(
+		&self, expression: Expression, module: &String, program: &mut ProgramState,
+	) -> Result<Object, AnyError> {
+		let left: Object = match expression {
+			Expression::Identifier(identifier) => {
+				match self.identifier(identifier, module, program) {
+					Ok(object) => object,
+					Err(exception) => return Err(exception),
+				}
+			}
+			Expression::Literal(literal) => match self.literal(literal, module, program) {
+				Ok(object) => object,
+				Err(exception) => return Err(exception),
+			},
+		};
+
+		Ok(left)
+	}
+
 	fn statement(
 		&self, statement: Statement, module: &String, program: &mut ProgramState,
 	) -> Result<Object, AnyError> {
