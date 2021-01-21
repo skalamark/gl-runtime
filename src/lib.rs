@@ -1,10 +1,12 @@
 // Copyright 2021 the GLanguage authors. All rights reserved. MIT license.
 
 use gl_core::ast::{AbstractSyntaxTree, Expression, Literal, Statement};
-use gl_core::error::{AnyError, Error, Exception};
+use gl_core::error::{Exception, ExceptionError, ExceptionMain};
 use gl_core::object::Object;
 use gl_core::position::Position;
 use gl_core::state::ProgramState;
+
+type ResultRuntime = Result<Object, ExceptionMain>;
 
 pub struct Runtime {}
 
@@ -14,8 +16,8 @@ impl Runtime {
 	}
 
 	fn literal(
-		&self, literal: Literal, module: &String, program: &mut ProgramState,
-	) -> Result<Object, AnyError> {
+		&self, literal: Literal, _: &String, _: &mut ProgramState,
+	) -> ResultRuntime {
 		let result: Object = match literal {
 			Literal::Null => Object::Null,
 			Literal::Integer(integer) => Object::Integer(integer),
@@ -28,22 +30,23 @@ impl Runtime {
 
 	fn identifier(
 		&self, identifier: String, module: &String, program: &mut ProgramState,
-	) -> Result<Object, AnyError> {
+	) -> ResultRuntime {
 		match program.env.get(&identifier, module) {
 			Some(object) => return Ok(object.clone()),
 			None => {
-				return Err(Exception::new(
-					module.clone(),
-					Position::default(),
-					Error::name(format!("name '{}' is not defined", &identifier)),
-				));
+				let mut exception = ExceptionMain::new(
+					ExceptionError::name(format!("name '{}' is not defined", &identifier)),
+					true,
+				);
+				exception.push(Exception::new(module.clone(), Position::default()));
+				return Err(exception);
 			}
 		}
 	}
 
 	fn expression(
 		&self, expression: Expression, module: &String, program: &mut ProgramState,
-	) -> Result<Object, AnyError> {
+	) -> ResultRuntime {
 		let left: Object = match expression {
 			Expression::Identifier(identifier) => {
 				match self.identifier(identifier, module, program) {
@@ -62,7 +65,7 @@ impl Runtime {
 
 	fn statement(
 		&self, statement: Statement, module: &String, program: &mut ProgramState,
-	) -> Result<Object, AnyError> {
+	) -> ResultRuntime {
 		let mut result: Object = Object::Null;
 
 		match statement {
@@ -86,7 +89,7 @@ impl Runtime {
 
 	pub fn run(
 		&self, ast: AbstractSyntaxTree, module: &String, program: &mut ProgramState,
-	) -> Result<Object, AnyError> {
+	) -> ResultRuntime {
 		let mut result: Object = Object::Null;
 
 		for statement in ast.statements {
