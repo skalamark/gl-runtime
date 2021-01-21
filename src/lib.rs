@@ -5,6 +5,7 @@ use gl_core::error::{Exception, ExceptionError, ExceptionMain};
 use gl_core::object::Object;
 use gl_core::position::Position;
 use gl_core::state::ProgramState;
+use std::collections::HashMap;
 
 type ResultRuntime = Result<Object, ExceptionMain>;
 
@@ -15,14 +16,60 @@ impl Runtime {
 		Self {}
 	}
 
+	fn literal_hashmap(
+		&self, hashmap_literal: Vec<(Expression, Expression)>, module: &String,
+		program: &mut ProgramState,
+	) -> ResultRuntime {
+		let mut hashmap: HashMap<Object, Object> = HashMap::new();
+
+		for (key_expression, value_expression) in hashmap_literal {
+			let key: Object = match self.expression(key_expression, module, program) {
+				Ok(object) => object,
+				Err(exception) => return Err(exception),
+			};
+
+			let value: Object = match self.expression(value_expression, module, program) {
+				Ok(object) => object,
+				Err(exception) => return Err(exception),
+			};
+
+			hashmap.insert(key, value);
+		}
+
+		Ok(Object::HashMap(hashmap))
+	}
+
+	fn literal_vec(
+		&self, vector: Vec<Expression>, module: &String, program: &mut ProgramState,
+	) -> ResultRuntime {
+		let mut list: Vec<Object> = Vec::new();
+
+		for expression in vector {
+			match self.expression(expression, module, program) {
+				Ok(object) => list.push(object),
+				Err(exception) => return Err(exception),
+			}
+		}
+
+		Ok(Object::Vec(list))
+	}
+
 	fn literal(
-		&self, literal: Literal, _: &String, _: &mut ProgramState,
+		&self, literal: Literal, module: &String, program: &mut ProgramState,
 	) -> ResultRuntime {
 		let result: Object = match literal {
 			Literal::Null => Object::Null,
 			Literal::Integer(integer) => Object::Integer(integer),
 			Literal::Boolean(boolean) => Object::Boolean(boolean),
 			Literal::String(string) => Object::String(string),
+			Literal::Vec(vector) => match self.literal_vec(vector, module, program) {
+				Ok(object) => object,
+				Err(exception) => return Err(exception),
+			},
+			Literal::HashMap(hashmap) => match self.literal_hashmap(hashmap, module, program) {
+				Ok(object) => object,
+				Err(exception) => return Err(exception),
+			},
 		};
 
 		Ok(result)
