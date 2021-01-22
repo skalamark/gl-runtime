@@ -1,10 +1,11 @@
 // Copyright 2021 the GLanguage authors. All rights reserved. MIT license.
 
-use gl_core::ast::{AbstractSyntaxTree, Expression, Literal, Statement};
+use gl_core::ast::{AbstractSyntaxTree, Expression, Infix, Literal, Prefix, Statement};
 use gl_core::error::{Exception, ExceptionError, ExceptionMain};
 use gl_core::object::Object;
 use gl_core::position::Position;
 use gl_core::state::ProgramState;
+use num::BigInt;
 use std::collections::HashMap;
 
 type ResultRuntime = Result<Object, ExceptionMain>;
@@ -14,6 +15,151 @@ pub struct Runtime {}
 impl Runtime {
 	pub fn new() -> Self {
 		Self {}
+	}
+
+	fn _is_truthy(object: &Object) -> bool {
+		match object {
+			Object::Null | Object::Boolean(false) => false,
+			_ => true,
+		}
+	}
+
+	fn infix(
+		&self, infix: Infix, left: Object, right: Object, module: &String, _: &mut ProgramState,
+	) -> ResultRuntime {
+		match left {
+			Object::Integer(left_integer) => {
+				if let Object::Integer(right_integer) = right {
+					Ok(match infix {
+						Infix::Plus => Object::Integer(left_integer + right_integer),
+						Infix::Minus => Object::Integer(left_integer - right_integer),
+						Infix::Multiply => Object::Integer(left_integer * right_integer),
+						Infix::Divide => Object::Integer(left_integer / right_integer),
+						Infix::LessThan => Object::Boolean(left_integer < right_integer),
+						Infix::LessThanEqual => Object::Boolean(left_integer <= right_integer),
+						Infix::GreaterThan => Object::Boolean(left_integer > right_integer),
+						Infix::GreaterThanEqual => Object::Boolean(left_integer >= right_integer),
+						Infix::Equal => Object::Boolean(left_integer == right_integer),
+						Infix::NotEqual => Object::Boolean(left_integer != right_integer),
+					})
+				} else {
+					let mut exception = ExceptionMain::new(
+						ExceptionError::type_(format!("unsupported operand type(s) for {}", infix)),
+						true,
+					);
+					exception.push(Exception::new(module.clone(), Position::default()));
+					return Err(exception);
+				}
+			}
+			Object::String(left_string) => {
+				if let Object::String(right_string) = right {
+					Ok(match infix {
+						Infix::Plus => Object::String(format!("{}{}", left_string, right_string)),
+						_ => {
+							let mut exception = ExceptionMain::new(
+								ExceptionError::type_(format!(
+									"unsupported operand type(s) for {}",
+									infix
+								)),
+								true,
+							);
+							exception.push(Exception::new(module.clone(), Position::default()));
+							return Err(exception);
+						}
+					})
+				} else if let Object::Integer(right_integer) = right {
+					Ok(match infix {
+						Infix::Multiply => {
+							let mut result_string: String = String::new();
+							let mut i = right_integer;
+							let zero = BigInt::parse_bytes(b"0", 10).unwrap();
+							while i > zero {
+								i = i - 1;
+								result_string = format!("{}{}", result_string, left_string.clone());
+							}
+							Object::String(result_string)
+						}
+						_ => {
+							let mut exception = ExceptionMain::new(
+								ExceptionError::type_(format!(
+									"unsupported operand type(s) for {}",
+									infix
+								)),
+								true,
+							);
+							exception.push(Exception::new(module.clone(), Position::default()));
+							return Err(exception);
+						}
+					})
+				} else {
+					let mut exception = ExceptionMain::new(
+						ExceptionError::type_(format!("unsupported operand type(s) for {}", infix)),
+						true,
+					);
+					exception.push(Exception::new(module.clone(), Position::default()));
+					return Err(exception);
+				}
+			}
+			_ => {
+				let mut exception = ExceptionMain::new(
+					ExceptionError::type_(format!("unsupported operand type(s) for +")),
+					true,
+				);
+				exception.push(Exception::new(module.clone(), Position::default()));
+				return Err(exception);
+			}
+		}
+	}
+
+	fn prefix_minus_op(
+		&self, right: Object, module: &String, _: &mut ProgramState,
+	) -> ResultRuntime {
+		Ok(match right {
+			Object::Integer(integer) => Object::Integer(-integer),
+			_ => {
+				let mut exception = ExceptionMain::new(
+					ExceptionError::type_(format!("bad operand type for unary -")),
+					true,
+				);
+				exception.push(Exception::new(module.clone(), Position::default()));
+				return Err(exception);
+			}
+		})
+	}
+
+	fn prefix_plus_op(
+		&self, right: Object, module: &String, _: &mut ProgramState,
+	) -> ResultRuntime {
+		Ok(match right {
+			Object::Integer(integer) => Object::Integer(integer),
+			_ => {
+				let mut exception = ExceptionMain::new(
+					ExceptionError::type_(format!("bad operand type for unary +")),
+					true,
+				);
+				exception.push(Exception::new(module.clone(), Position::default()));
+				return Err(exception);
+			}
+		})
+	}
+
+	fn prefix_not_op(&self, right: Object, _: &String, _: &mut ProgramState) -> ResultRuntime {
+		Ok(match right {
+			Object::Boolean(true) => Object::Boolean(false),
+			Object::Boolean(false) => Object::Boolean(true),
+			Object::Null => Object::Boolean(true),
+			_ => Object::Boolean(false),
+		})
+	}
+
+	fn prefix(
+		&self, prefix: Prefix, right: Object, module: &String, program: &mut ProgramState,
+	) -> ResultRuntime {
+		match prefix {
+			Prefix::Not => self.prefix_not_op(right, module, program),
+			Prefix::Plus => self.prefix_plus_op(right, module, program),
+			Prefix::Minus => self.prefix_minus_op(right, module, program),
+		}
 	}
 
 	fn literal_hashmap(
@@ -105,6 +251,27 @@ impl Runtime {
 				Ok(object) => object,
 				Err(exception) => return Err(exception),
 			},
+			Expression::Prefix(prefix, right_expression) => {
+				match self.expression(*right_expression, module, program) {
+					Ok(right) => match self.prefix(prefix, right, module, program) {
+						Ok(object) => object,
+						Err(exception) => return Err(exception),
+					},
+					Err(exception) => return Err(exception),
+				}
+			}
+			Expression::Infix(infix, left_expression, right_expression) => {
+				match self.expression(*left_expression, module, program) {
+					Ok(left) => match self.expression(*right_expression, module, program) {
+						Ok(right) => match self.infix(infix, left, right, module, program) {
+							Ok(object) => object,
+							Err(exception) => return Err(exception),
+						},
+						Err(exception) => return Err(exception),
+					},
+					Err(exception) => return Err(exception),
+				}
+			}
 		};
 
 		Ok(left)
