@@ -24,6 +24,49 @@ impl Runtime {
 		}
 	}
 
+	fn call(
+		&self, function: Box<Expression>, arguments: Vec<Expression>, module: &String,
+		program: &mut ProgramState,
+	) -> ResultRuntime {
+		let mut args: Vec<Object> = Vec::new();
+
+		for arg in arguments {
+			match self.expression(arg, module, program) {
+				Ok(object) => args.push(object),
+				Err(exception) => return Err(exception),
+			}
+		}
+
+		match self.expression(*function, module, program) {
+			Ok(Object::Builtin(name, expect_param_num, f)) => {
+				if expect_param_num < 0 || expect_param_num == args.len() as i32 {
+					return f(args, module.clone(), Position::new(0, 0));
+				} else {
+					let mut exception = ExceptionMain::new(
+						ExceptionError::type_(format!(
+							"{}() takes {} positional argument but {} were given",
+							&name,
+							expect_param_num,
+							args.len(),
+						)),
+						true,
+					);
+					exception.push(Exception::new(module.clone(), Position::default()));
+					return Err(exception);
+				}
+			}
+			Ok(_) => {
+				let mut exception = ExceptionMain::new(
+					ExceptionError::type_(format!("object is not callable")),
+					true,
+				);
+				exception.push(Exception::new(module.clone(), Position::default()));
+				return Err(exception);
+			}
+			Err(exception) => return Err(exception),
+		}
+	}
+
 	fn infix(
 		&self, infix: Infix, left: Object, right: Object, module: &String, _: &mut ProgramState,
 	) -> ResultRuntime {
@@ -272,6 +315,13 @@ impl Runtime {
 					Err(exception) => return Err(exception),
 				}
 			}
+			Expression::Call {
+				function,
+				arguments,
+			} => match self.call(function, arguments, module, program) {
+				Ok(object) => object,
+				Err(exception) => return Err(exception),
+			},
 		};
 
 		Ok(left)
