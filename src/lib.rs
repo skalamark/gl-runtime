@@ -5,16 +5,27 @@ use gl_core::error::{Exception, ExceptionError, ExceptionMain};
 use gl_core::object::Object;
 use gl_core::position::Position;
 use gl_core::state::ProgramState;
+use gl_core::utils::Env;
 use num::BigInt;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 type ResultRuntime = Result<Object, ExceptionMain>;
 
-pub struct Runtime {}
+pub struct Runtime {
+	env: Rc<RefCell<Env>>,
+}
 
 impl Runtime {
 	pub fn new() -> Self {
-		Self {}
+		Self {
+			env: Rc::new(RefCell::new(Env::new())),
+		}
+	}
+
+	pub fn new_from_env(env: Rc<RefCell<Env>>) -> Self {
+		Self { env }
 	}
 
 	fn _is_truthy(object: &Object) -> bool {
@@ -37,7 +48,7 @@ impl Runtime {
 			}
 		}
 
-		match self.expression(*function, module, program) {
+		let (name, params, body) = match self.expression(*function, module, program) {
 			Ok(Object::Builtin(name, expect_param_num, f)) => {
 				if expect_param_num < 0 || expect_param_num == args.len() as i32 {
 					return f(args, module.clone(), Position::new(0, 0));
@@ -55,6 +66,7 @@ impl Runtime {
 					return Err(exception);
 				}
 			}
+			Ok(Object::Fn(name, params, body)) => (name, params, body),
 			Ok(_) => {
 				let mut exception = ExceptionMain::new(
 					ExceptionError::type_(format!("object is not callable")),
@@ -64,7 +76,44 @@ impl Runtime {
 				return Err(exception);
 			}
 			Err(exception) => return Err(exception),
+		};
+
+		if params.len() != args.len() {
+			let mut exception = ExceptionMain::new(
+				ExceptionError::type_(format!(
+					"{}() takes {} positional argument but {} were given",
+					if let Some(name_fn) = name {
+						name_fn
+					} else {
+						format!("<anonymous>")
+					},
+					params.len(),
+					args.len(),
+				)),
+				true,
+			);
+			exception.push(Exception::new(module.clone(), Position::default()));
+			return Err(exception);
 		}
+
+		let mut scoped_env: Env = Env::new_with_parent(Rc::clone(&self.env));
+		let list = params.iter().zip(args.iter());
+		for (_, (name, o)) in list.enumerate() {
+			scoped_env.set(name, o.clone());
+		}
+		let runtime: Runtime = Runtime::new_from_env(Rc::new(RefCell::new(scoped_env)));
+		let mut ast: AbstractSyntaxTree = AbstractSyntaxTree::new();
+		ast.statements = body.0;
+
+		let object: Object = match runtime.run(ast, module, program) {
+			Ok(object) => object,
+			Err(mut exception) => {
+				exception.push(Exception::new(module.clone(), Position::default()));
+				return Err(exception);
+			}
+		};
+
+		Ok(object)
 	}
 
 	fn infix(
@@ -265,12 +314,12 @@ impl Runtime {
 	}
 
 	fn identifier(
-		&self, identifier: String, module: &String, program: &mut ProgramState,
+		&self, identifier: String, module: &String, _: &mut ProgramState,
 	) -> ResultRuntime {
-		match program.env.get(&identifier, module) {
+		match self.env.borrow().get(&identifier) {
 			Some(object) => return Ok(object.clone()),
 			None => {
-				let mut exception = ExceptionMain::new(
+				let mut exception: ExceptionMain = ExceptionMain::new(
 					ExceptionError::name(format!("name '{}' is not defined", &identifier)),
 					true,
 				);
@@ -322,6 +371,7 @@ impl Runtime {
 				Ok(object) => object,
 				Err(exception) => return Err(exception),
 			},
+			Expression::Fn { params, body } => Object::Fn(None, params, body),
 		};
 
 		Ok(left)
@@ -336,9 +386,17 @@ impl Runtime {
 			Statement::Let(name, value) => {
 				let value_object: Object = match self.expression(value, module, program) {
 					Ok(object) => object,
-					Err(exception) => return Err(exception),
+					Err(exception) => {
+						self.env.borrow_mut().set(&name, Object::Null);
+						return Err(exception);
+					}
 				};
-				program.env.set(&name, value_object, module);
+				self.env.borrow_mut().set(&name, value_object);
+			}
+			Statement::Fn { name, params, body } => {
+				self.env
+					.borrow_mut()
+					.set(&name.clone(), Object::Fn(Some(name), params, body));
 			}
 			Statement::Expression(expression) => {
 				match self.expression(expression, module, program) {
