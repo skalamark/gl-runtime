@@ -2,6 +2,7 @@
 
 use crate::preludes::*;
 use gl_core::preludes::*;
+use libloading::Library;
 
 impl Runtime {
 	pub fn statement(&self, statement: Statement) -> ResultRuntime {
@@ -27,6 +28,20 @@ impl Runtime {
 				let _ = self.expression(expression)?;
 			}
 			Statement::ExpressionReturn(expression) => result = self.expression(expression)?,
+			Statement::Import(name) => {
+				let dynlibrary: Library = unsafe { Library::new(name.clone()).unwrap() };
+				let mut moduledynlibrary: ModuleDynLibrary =
+					ModuleDynLibrary::new(name.clone(), dynlibrary, HashMap::new());
+				let init: fn(HashMap<String, Object>) -> Result<(), Exception> =
+					moduledynlibrary.get_function(format!("init"))?;
+				init(HashMap::new())?;
+
+				let namemoduledynlibrary: String = moduledynlibrary.get_name();
+				let value_object: Object = Object::ModuleDynLibrary(moduledynlibrary);
+				self.env
+					.borrow_mut()
+					.set(&namemoduledynlibrary, value_object);
+			}
 		}
 
 		Ok(result)
