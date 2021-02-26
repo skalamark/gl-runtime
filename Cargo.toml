@@ -14,3 +14,4 @@ description = "Um runtime para interpretação da linguagem de script GLanguage"
 gl_core = { path = "../gl-core", version = "0.1.0-alpha" }
 
 num = "0.3.1"
+libloading = "0.7.0"
