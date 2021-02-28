@@ -47,13 +47,25 @@ impl Runtime {
 		};
 
 		if params.len() != args.len() {
-			let mut exception = Exception::new(
+			let mut exception: Exception = Exception::new(
 				Except::type_(format!(
-					"{}() takes {} positional argument but {} were given",
+					"{}{} takes {} positional argument but {} were given",
 					if let Some(name_fn) = name {
 						name_fn
 					} else {
 						format!("<anonymous>")
+					},
+					{
+						let mut params_string: String = String::new();
+						params_string.push_str(&format!("("));
+						for (i, param) in params.iter().enumerate() {
+							params_string.push_str(&format!("{}", param));
+							if i < params.len() - 1 {
+								params_string.push_str(", ");
+							}
+						}
+						params_string.push_str(&format!(")"));
+						params_string
 					},
 					params.len(),
 					args.len(),
@@ -68,10 +80,10 @@ impl Runtime {
 		}
 
 		let mut scoped_env: Env = Env::new_with_parent(Rc::clone(&self.env));
-		let list = params.iter().zip(args.iter());
-		for (_, (name, o)) in list.enumerate() {
-			scoped_env.set(name, o.clone());
+		for (name, o) in params.iter().zip(args) {
+			scoped_env.set(name, o);
 		}
+
 		let runtime: Runtime = Runtime::from_env(
 			Rc::new(RefCell::new(scoped_env)),
 			self.module_context.clone(),
