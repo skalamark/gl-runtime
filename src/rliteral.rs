@@ -1,7 +1,8 @@
 // Copyright 2021 the GLanguage authors. All rights reserved. MIT license.
 
-use crate::preludes::*;
 use gl_core::preludes::*;
+
+use crate::preludes::*;
 
 impl Runtime {
 	pub fn literal(&self, literal: Literal) -> ResultRuntime {
@@ -34,7 +35,6 @@ impl Runtime {
 		for (key_expression, value_expression) in hashmap_literal {
 			let key: Object = self.expression(key_expression)?;
 			let value: Object = self.expression(value_expression)?;
-
 			hashmap.insert(key, value);
 		}
 
