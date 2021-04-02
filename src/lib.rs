@@ -1,21 +1,20 @@
 // Copyright 2021 the GLanguage authors. All rights reserved. MIT license.
 
-use crate::preludes::*;
-use gl_core::env::Env;
 use gl_core::preludes::*;
+
+use crate::preludes::*;
 
 mod rcall;
 mod rexpression;
 mod ridentifier;
+mod rindex;
 mod rinfix;
 mod rliteral;
 mod rprefix;
 mod rstatement;
 
 pub mod preludes {
-	use gl_core::preludes::*;
-
-	pub type ResultRuntime = Result<Object, Exception>;
+	pub type ResultRuntime = Result<super::Object, super::Exception>;
 	pub use crate::Runtime;
 }
 
@@ -25,18 +24,12 @@ pub struct Runtime {
 }
 
 impl Runtime {
-	pub fn new(module_context: String) -> Self {
-		Self {
-			env: Rc::new(RefCell::new(Env::new())),
-			module_context,
-		}
+	pub fn new<T: Into<String>>(module_context: T) -> Self {
+		Self { env: Rc::new(RefCell::new(Env::new())), module_context: module_context.into() }
 	}
 
-	pub fn from_env(env: Rc<RefCell<Env>>, module_context: String) -> Self {
-		Self {
-			env,
-			module_context,
-		}
+	pub fn from_env<T: Into<String>>(env: Rc<RefCell<Env>>, module_context: T) -> Self {
+		Self { env, module_context: module_context.into() }
 	}
 
 	pub fn run_with_parser(&self, mut parser: Parser) -> ResultRuntime {
