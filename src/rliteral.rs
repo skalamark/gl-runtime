@@ -13,6 +13,7 @@ impl Runtime {
 			Literal::Boolean(boolean) => Object::Boolean(boolean),
 			Literal::String(string) => Object::String(string),
 			Literal::Vec(vector) => self.literal_vec(vector)?,
+			Literal::Tuple(tuple) => self.literal_tuple(tuple)?,
 			Literal::HashMap(hashmap) => self.literal_hashmap(hashmap)?,
 		};
 
@@ -27,6 +28,16 @@ impl Runtime {
 		}
 
 		Ok(Object::Vec(list))
+	}
+
+	pub fn literal_tuple(&self, tuple_literal: Vec<Expression>) -> ResultRuntime {
+		let mut tuple: Vec<Object> = Vec::new();
+
+		for expression in tuple_literal {
+			tuple.push(self.expression(expression)?);
+		}
+
+		Ok(Object::Tuple(tuple))
 	}
 
 	pub fn literal_hashmap(&self, hashmap_literal: Vec<(Expression, Expression)>) -> ResultRuntime {
