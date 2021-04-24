@@ -27,33 +27,41 @@ impl Runtime {
 				let _ = self.expression(expression)?;
 			},
 			Statement::ExpressionReturn(expression) => result = self.expression(expression)?,
-			Statement::Import(path) => {
-				let dynlibrary: Library = unsafe {
-					match Library::new(path.clone()) {
-						Ok(dynlibrary) => dynlibrary,
-						Err(err) => {
-							let mut exception: Exception =
-								Exception::in_runtime(Except::error(err.to_string()));
-							exception.push(ExceptionPoint::new(
-								self.module_context.clone(),
-								Position::default(),
-							));
-							return Err(exception);
-						},
-					}
-				};
-				let name: String = format!(
-					"{}",
-					std::path::Path::new(&path).file_stem().unwrap().to_str().unwrap()
-				);
-				let mut moduledynlibrary: ModuleDynLibrary =
-					ModuleDynLibrary::new(name.clone(), path, dynlibrary, HashMap::new());
+			Statement::Import(path_string) => {
+				let path = std::path::Path::new(&path_string);
 
-				if let Ok(init) = moduledynlibrary.get_function("init") {
-					init(Vec::new())?;
-				};
+				if path.is_file() && path.extension().unwrap() == "gl" {
+					unimplemented!()
+				} else {
+					let name: String = format!("{}", path.file_stem().unwrap().to_str().unwrap());
+					let dynlibrary: Library = unsafe {
+						match Library::new(path) {
+							Ok(dynlibrary) => dynlibrary,
+							Err(err) => {
+								let mut exception: Exception =
+									Exception::in_runtime(Except::error(err.to_string()));
+								exception.push(ExceptionPoint::new(
+									&self.module_context,
+									Position::default(),
+								));
+								return Err(exception);
+							},
+						}
+					};
 
-				self.env.borrow_mut().set(name, Object::ModuleDynLibrary(moduledynlibrary));
+					let moduledynlibrary: ModuleDynLibrary = ModuleDynLibrary::new(
+						&name,
+						&path_string,
+						Rc::new(RefCell::new(dynlibrary)),
+						Rc::new(RefCell::new(Env::new())),
+					);
+
+					if let Ok(Object::FnRust(_, _, function)) = moduledynlibrary.get_attr("init") {
+						function(Vec::new())?;
+					};
+
+					self.env.borrow_mut().set(name, Object::ModuleDynLibrary(moduledynlibrary));
+				}
 			},
 		}
 
