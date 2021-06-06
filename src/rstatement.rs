@@ -18,10 +18,10 @@ impl Runtime {
 						return Err(exception);
 					},
 				};
-				self.env.borrow_mut().set(&name, value_object);
+				self.env.borrow_mut().set(name, value_object);
 			},
 			Statement::Fn { name, params, body } => {
-				self.env.borrow_mut().set(&name.clone(), Object::Fn(Some(name), params, body));
+				self.env.borrow_mut().set(&name, Object::Fn(Some(name.clone()), params, body));
 			},
 			Statement::Expression(expression) => {
 				let _ = self.expression(expression)?;
