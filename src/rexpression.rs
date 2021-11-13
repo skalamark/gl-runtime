@@ -16,7 +16,7 @@ impl Runtime {
 				self.expression(*left_expression)?,
 				self.expression(*right_expression)?,
 			),
-			Expression::Fn { params, body } => Ok(Object::Fn(None, params, body)),
+			Expression::Fn { params, body } => Ok(Object::Fn(GFunction::new(None, params, body))),
 			Expression::Call { function, arguments } => self.call(function, arguments),
 			Expression::Index(left_expression, index_expression) =>
 				self.index(self.expression(*left_expression)?, self.expression(*index_expression)?),

@@ -17,30 +17,9 @@ impl Runtime {
 		}
 
 		let (params, body) = match function {
-			Object::Builtin(name, expect_param_num, f) =>
-				return if expect_param_num < 0 || expect_param_num == args.len() as i32 {
-					match f(args) {
-						Ok(object) => Ok(object),
-						Err(mut exception) => {
-							exception.push(ExceptionPoint::new(
-								self.module_context.clone(),
-								Position::default(),
-							));
-							Err(exception)
-						},
-					}
-				} else {
-					let exception: Exception = Exception::in_runtime(Except::type_(format!(
-						"{}() expected {} argument, found {}",
-						&name,
-						expect_param_num,
-						args.len(),
-					)));
-					Err(exception)
-				},
-			Object::FnRust(name, expect_param_num, f) =>
-				return if expect_param_num < 0 || expect_param_num == args.len() as i32 {
-					match f(args) {
+			Object::FnNative(GFunctionNative { name, params_len, body }) =>
+				return if params_len < 0 || params_len == args.len() as i32 {
+					match body(args) {
 						Ok(object) => Ok(object),
 						Err(mut exception) => {
 							exception.push(ExceptionPoint::new(
@@ -57,12 +36,12 @@ impl Runtime {
 							Some(name_fn) => name_fn,
 							None => format!("<anonymous>"),
 						},
-						expect_param_num,
+						params_len,
 						args.len(),
 					)));
 					Err(exception)
 				},
-			Object::Fn(name, params, body) =>
+			Object::Fn(GFunction { name, params, body }) =>
 				if params.len() == args.len() {
 					(params, body)
 				} else {

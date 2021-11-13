@@ -21,7 +21,9 @@ impl Runtime {
 				self.env.borrow_mut().set(name, value_object);
 			},
 			Statement::Fn { name, params, body } => {
-				self.env.borrow_mut().set(&name, Object::Fn(Some(name.clone()), params, body));
+				self.env
+					.borrow_mut()
+					.set(&name, Object::Fn(GFunction::new(Some(name.clone()), params, body)));
 			},
 			Statement::Expression(expression) => {
 				let _ = self.expression(expression)?;
@@ -56,8 +58,10 @@ impl Runtime {
 						Rc::new(RefCell::new(Env::new())),
 					);
 
-					if let Ok(Object::FnRust(_, _, function)) = moduledynlibrary.get_attr("init") {
-						function(Vec::new())?;
+					if let Ok(Object::FnNative(GFunctionNative { name: _, params_len: _, body })) =
+						moduledynlibrary.get_attr("init")
+					{
+						body(Vec::new())?;
 					};
 
 					self.env.borrow_mut().set(name, Object::ModuleDynLibrary(moduledynlibrary));
