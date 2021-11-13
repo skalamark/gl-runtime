@@ -14,5 +14,5 @@ description = "Runtime GLanguage"
 gl_core = { path = "../gl-core", version = "0.1.0-alpha" }
 
 num = "0.4.0"
-libloading = "0.7.0"
+libloading = "0.7.1"
 downcast-rs = "1.2.0"
